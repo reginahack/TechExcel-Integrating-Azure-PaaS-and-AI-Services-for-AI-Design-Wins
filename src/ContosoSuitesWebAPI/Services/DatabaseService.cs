@@ -82,10 +82,11 @@ public class DatabaseService : IDatabaseService
     /// Get bookings for a specific hotel that are after a specified date.
     /// </summary>
     [KernelFunction]
-     [Description("Get all bookings per hotel and minimum date.")]
-
-    public async Task<IEnumerable<Booking>> GetBookingsByHotelAndMinimumDate([Description("The ID of the hotel")] int hotelId , [Description("The date time of the booking")] DateTime dt)
-    {
+        [Description("Get all bookings per hotel and minimum date.")]
+    public async Task<IEnumerable<Booking>> GetBookingsByHotelAndMinimumDate(
+        [Description("The ID of the hotel")] int hotelId, 
+        [Description("The date time of the booking")] DateTime dt
+        ){
         var sql = "SELECT BookingID, CustomerID, HotelID, StayBeginDate, StayEndDate, NumberOfGuests FROM dbo.Booking WHERE HotelID = @HotelID AND StayBeginDate >= @StayBeginDate";
         using var conn = new SqlConnection(
             connectionString: Environment.GetEnvironmentVariable("SQLAZURECONNSTR_ContosoSuites")!
@@ -203,5 +204,4 @@ public class DatabaseService : IDatabaseService
     
          return bookings;
      }
-
 }
