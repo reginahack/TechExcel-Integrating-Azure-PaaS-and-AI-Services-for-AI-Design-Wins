@@ -1,3 +1,6 @@
+ using Microsoft.SemanticKernel;
+ using Microsoft.SemanticKernel.Connectors.OpenAI;
+ using Microsoft.SemanticKernel.ChatCompletion;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using ContosoSuitesWebAPI.Agents;
@@ -29,6 +32,17 @@ builder.Services.AddSingleton<CosmosClient>((_) =>
     );
     return client;
 });
+builder.Services.AddSingleton<Kernel>((_) =>
+{
+    IKernelBuilder kernelBuilder = Kernel.CreateBuilder();
+    kernelBuilder.AddAzureOpenAIChatCompletion(
+        deploymentName: builder.Configuration["AzureOpenAI:DeploymentName"]!,
+        endpoint: builder.Configuration["AzureOpenAI:Endpoint"]!,
+        apiKey: builder.Configuration["AzureOpenAI:ApiKey"]!
+    );
+    kernelBuilder.Plugins.AddFromType<DatabaseService>();
+    return kernelBuilder.Build();
+});
 
 // Create a single instance of the AzureOpenAIClient to be shared across the application.
 builder.Services.AddSingleton<AzureOpenAIClient>((_) =>
@@ -41,6 +55,10 @@ builder.Services.AddSingleton<AzureOpenAIClient>((_) =>
 });
 
 var app = builder.Build();
+var config = new ConfigurationBuilder()
+    .AddUserSecrets<Program>()
+    .AddEnvironmentVariables()
+    .Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -124,5 +142,19 @@ app.MapPost("/MaintenanceCopilotChat", async ([FromBody]string message, [FromSer
 })
     .WithName("Copilot")
     .WithOpenApi();
+ app.MapPost("/Chat", async Task<string> (HttpRequest request) =>
+ {
+     var message = await Task.FromResult(request.Form["message"]);
+     var kernel = app.Services.GetRequiredService<Kernel>();
+     var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
+     var executionSettings = new OpenAIPromptExecutionSettings
+     {
+         ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
+     };
+     var response = await chatCompletionService.GetChatMessageContentAsync(message.ToString(), executionSettings, kernel);
+     return response?.Content!;
+ })
+     .WithName("Chat")
+     .WithOpenApi();
 
 app.Run();
